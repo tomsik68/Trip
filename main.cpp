@@ -6,6 +6,23 @@ using namespace std;
 
 #define WIDTH  640
 #define HEIGHT 480
+#define FLOOR_COLOR   0x787878 
+#define PORTAL_COLOR  0X6BCBFF
+#define CEILING_COLOR 0xFFA270
+
+struct Sector{
+	
+};
+
+struct Scene{
+	
+};
+
+struct Player{
+	struct xyz   { float x,y,z; } position, velocity;
+	struct gonio { float value,sin,cos;} angle;
+	unsigned sector;
+};
 
 SDL_Event event;
 SDL_Surface* screen;
@@ -13,6 +30,13 @@ bool running;
 
 void logDebug(const char* msg){
 	cout << "DEBUG: " << msg << endl;
+}
+
+void vline(int x, int y1, int y2){
+	int* pix = (int*) screen->pixels;
+	for(int y = 0;  y < y1; ++y)     pix[x+y*WIDTH] = CEILING_COLOR;
+	for(int y = y1; y < y2; ++y)     pix[x+y*WIDTH] = PORTAL_COLOR;
+	for(int y = y2; y < HEIGHT; ++y) pix[x+y*WIDTH] = FLOOR_COLOR;
 }
 
 int init(){
@@ -49,9 +73,10 @@ void update(){
 }
 
 void render(){
-	int *pix = (int*) screen->pixels;
+	/*int* pix = (int*) screen->pixels;
 	for(int y=0; y < HEIGHT; ++y)
-		for(int x=0; x < WIDTH; ++x) pix[x+y*WIDTH] = rand() % (256*256*256);	
+		for(int x=0; x < WIDTH; ++x) pix[x+y*WIDTH] = rand() % (256*256*256);*/
+	for(int i = 0; i < WIDTH; ++i) vline(i,100,300);
 }
 
 void loop(){
