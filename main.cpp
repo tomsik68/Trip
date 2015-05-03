@@ -1,24 +1,36 @@
 #include <iostream>
 #include <stdlib.h>
-#include <SDL/SDL.h>
-#
+#include <math.h>
+#include <map>
+#include <SDL2/SDL.h>
 
 using namespace std;
 
 #define WIDTH  640
 #define HEIGHT 480
 #define FOV    75
+#define SPEED  2
+#define ASPEED 3.14/16
 #define FLOOR_COLOR   0x787878 
 #define PORTAL_COLOR  0X6BCBFF
 #define CEILING_COLOR 0xFFA270
 
-struct xy{
+struct Point3D{
+	float x,y,z;
+};
+
+struct Point2D{
 	float x,y;
+};
+
+struct Transform{
+	Point3D translate;
+	Point3D rotate;
 };
 
 struct Sector{
 	float floor,ceil;
-	xy* vertices;
+	Point2D* vertices;
 	unsigned cpoints;
 };
 
@@ -28,74 +40,52 @@ struct Scene{
 };
 
 struct Player{
-	struct xyz   { float x,y,z; } position, velocity;
+	Point3D position, velocity;
 	struct gonio { float value,sin,cos; } angle;
 	unsigned sector;
 };
 
 SDL_Event event;
-SDL_Surface* screen;
+SDL_Window* window;
+SDL_Renderer* renderer;
+Transform transform;
 Scene  scene;
 Player player;
+Point3D p1,p2;
+map<int,bool> keys;
 bool running;
 
 void logDebug(const char* msg){
 	cout << "DEBUG: " << msg << endl;
 }
 
-void drawLine(int x1, int y1, int x2, int y2, int color){
-	logDebug("Drawing line...");
-	int* pix = (int*) screen->pixels;
-	int dx = x2 - x1;
-	int dy = y2 - y1;
-	int y;
-	cout << dx << " " << dy << endl;
-	cout << x1 << " " << y1 << " | " << x2 << " " << y2 << endl;
-	int s1 = min(x1,x2);
-	int s2 = max(x1,x2);
- 	for (int x = s1; x < s2; ++x){
-		y = y1 + dy * (x - x1) / dx;
-		cout << x << " " << y << endl;
-		pix[x+y*WIDTH] = color;	
-	}
-}
-
-void vline(int x, int y1, int y2){
-	logDebug("Drawing vertical line...");
-	cout << x << " " << y1 << " " << y2 << endl;
-	int* pix = (int*) screen->pixels;
-	for(int y = 0;  y < y1; ++y)     pix[x+y*WIDTH] = CEILING_COLOR;
-	for(int y = y1; y < y2; ++y)     pix[x+y*WIDTH] = PORTAL_COLOR;
-	for(int y = y2; y < HEIGHT; ++y) pix[x+y*WIDTH] = FLOOR_COLOR;
-}
-
 int createScene(){
-	scene.sectors = new Sector[1];
-	Sector* sector = &scene.sectors[0];
-	sector->floor = 0;
-	sector->ceil  = 1;
-	sector->vertices = new xy[4];
-	sector->vertices[0].x = 1;
-	sector->vertices[0].y = 1;
-	sector->vertices[1].x = -1;
-	sector->vertices[1].y = 1;
-	sector->vertices[2].x = -1;
-	sector->vertices[2].y = -1;
-	sector->vertices[3].x = 1;
-	sector->vertices[3].y = -1;
-	sector->cpoints = 4;
-	scene.csectors = 1;
+	transform.translate.x = WIDTH / 2;
+	transform.translate.y = HEIGHT / 2;
+	transform.translate.z = 0;
+	transform.rotate.x = 0;
+	transform.rotate.y = 0;
+	transform.rotate.z = 0;
+	player.position.x = 0;
+	player.position.y = 0;
+	player.position.z = 0;
+	player.velocity.x = 0;
+	player.velocity.y = 0;
+	player.velocity.z = 0;
+	player.angle.value = 0;
+	player.angle.sin = 0;
+	player.angle.cos = 1;
+	p1.x = -100;
+	p1.y = -100;
+	p2.x =  100;
+	p2.y = -100;
 }
 
 int init(){
-	logDebug("Initializing SDL2...");
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) return 1;
-	logDebug("SDL2 initialized.");
-	logDebug("Creating window...");
-	SDL_WM_SetCaption("Trip Test","Trip Test");
-	screen = SDL_SetVideoMode(WIDTH,HEIGHT,0,0);
-	if (screen == NULL) return 1;
-	logDebug("Window created.");
+	window = SDL_CreateWindow("TRIP_PRE-ALPHA",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WIDTH,HEIGHT,0);
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	if (window == NULL) return 1;
 	createScene();
 	return 0;
 }
@@ -111,65 +101,132 @@ void onEvent(){
 				case SDLK_ESCAPE:
 					running = false;
 					break;
+				case SDLK_w:
+					keys[SDLK_w] = true;
+					break;
+				case SDLK_s:
+					keys[SDLK_s] = true;
+					break;
+				case SDLK_a:
+					keys[SDLK_a] = true;
+					break;
+				case SDLK_d:
+					keys[SDLK_d] = true;
+					break;
+				case SDLK_LEFT:
+					keys[SDLK_LEFT] = true;
+					break;
+				case SDLK_RIGHT:
+					keys[SDLK_RIGHT] = true;
+					break;
 			}
 			break;
+		case SDL_KEYUP:
+			switch(event.key.keysym.sym){
+				case SDLK_w:
+					keys[SDLK_w] = false;
+					break;
+				case SDLK_s:
+					keys[SDLK_s] = false;
+					break;
+				case SDLK_a:
+					keys[SDLK_a] = false;
+					break;
+				case SDLK_d:
+					keys[SDLK_d] = false;
+					break;
+				case SDLK_LEFT:
+					keys[SDLK_LEFT] = false;
+					break;
+				case SDLK_RIGHT:
+					keys[SDLK_RIGHT] = false;
+					break;
+			}
 		}
 	}
 }
 
 void update(){
 
+	if(keys[SDLK_w]) player.velocity.y -= SPEED;
+	if(keys[SDLK_s]) player.velocity.y += SPEED;
+	if(keys[SDLK_a]) player.velocity.x -= SPEED;
+	if(keys[SDLK_d]) player.velocity.x += SPEED;
+	
+	if(keys[SDLK_LEFT]){
+		player.angle.value -= ASPEED;
+		player.angle.sin = sin(player.angle.value);
+		player.angle.cos = cos(player.angle.value);
+	}
+	
+	if(keys[SDLK_RIGHT]){
+		player.angle.value += ASPEED;
+		player.angle.sin = sin(player.angle.value);
+		player.angle.cos = cos(player.angle.value);
+	}
+
+	player.position.x -= player.velocity.y*player.angle.cos;
+	player.position.y -= player.velocity.y*player.angle.sin;
+
+	player.position.x -= player.velocity.x*player.angle.sin;
+	player.position.y -= player.velocity.x*player.angle.cos;
+
+	player.position.z += player.velocity.z;
+
+	player.velocity.x = 0;
+	player.velocity.y = 0;
+	player.velocity.z = 0;
 }
 
 void render(){
-	/*int* pix = (int*) screen->pixels;
-	for(int y=0; y < HEIGHT; ++y)
-		for(int x=0; x < WIDTH; ++x) pix[x+y*WIDTH] = rand() % (256*256*256);*/
-	//for(int i = 0; i < WIDTH; ++i) vline(i,100,300);
-	for(int i = 0; i < 1; ++i){
-		xy p1 = scene.sectors[0].vertices[i];
-		xy p2;
-		if (i == scene.sectors[0].cpoints) p2 = scene.sectors[0].vertices[0]; else p2 = scene.sectors[0].vertices[i+1];
-		
-		int x1  = (p1.x * FOV) / p1.y;
-		int y1a = HEIGHT - (scene.sectors[i].ceil  * FOV) / p1.y;
-		int y1b = HEIGHT - (scene.sectors[i].floor * FOV) / p1.y;
-
-		int x2  = (p2.x * FOV) / p2.y;
-		int y2a = HEIGHT - (scene.sectors[i].ceil  * FOV) / p2.y;
-		int y2b = HEIGHT - (scene.sectors[i].floor * FOV) / p2.y;
-
-		for (int x = x2; x < x1; ++x){
-			int ya = y1a + (x - x1) * (y2a - y1a) / (x2 - x1);
-			int yb = y1b + (x - x1) * (y2b - y1b) / (x2 - x1);
-
-			vline(x+FOV,ya,yb);
-		}
-
-	};
+	SDL_SetRenderDrawColor(renderer
+			,255
+			,255
+			,255
+			,255);
+	SDL_RenderDrawLine(renderer
+			,p1.x+transform.translate.x
+			,p1.y+transform.translate.y
+			,p2.x+transform.translate.x
+			,p2.y+transform.translate.y);
+	SDL_RenderDrawPoint(renderer
+			,player.position.x+transform.translate.x
+			,player.position.y+transform.translate.y);
+	SDL_SetRenderDrawColor(renderer
+			,255
+			,0
+			,0
+			,255);
+	SDL_RenderDrawLine(renderer
+			,player.position.x+transform.translate.x
+			,player.position.y+transform.translate.y
+			,player.position.x+transform.translate.x+player.angle.cos*8
+			,player.position.y+transform.translate.y+player.angle.sin*8);
+	
 }
 
 void loop(){
 	running = true;
 	while (running){
+		SDL_SetRenderDrawColor(renderer,0,0,0,255);
+		SDL_RenderClear(renderer);
 		onEvent();
 		update();
 		render();
-		SDL_UpdateRect(screen,0,0,0,0);
+		SDL_RenderPresent(renderer);
+		SDL_Delay(16);
 	}
 }
 
 void cleanUp(){
-	SDL_FreeSurface(screen);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
 	SDL_Quit();
 }
 
 int main(int argc, char* argv[]){
-	logDebug("Starting program.");
 	if (init() != 0) return 1;
-	logDebug("Starting loop.");
 	loop();
-	logDebug("Cleaning up");
 	cleanUp();
 	return 0;
 }
