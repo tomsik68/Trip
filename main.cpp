@@ -45,15 +45,15 @@ struct Player{
 	unsigned sector;
 };
 
-SDL_Event event;
-SDL_Window* window;
-SDL_Renderer* renderer;
-Transform transform;
-Scene  scene;
-Player player;
-Point3D p1,p2;
-map<int,bool> keys;
-bool running;
+SDL_Event       event;
+SDL_Window*     window;
+SDL_Renderer*   renderer;
+Transform       transform;
+Scene           scene;
+Player          player;
+Point3D         p1,p2;
+map<int,bool>   keys;
+bool            running;
 
 void logDebug(const char* msg){
 	cout << "DEBUG: " << msg << endl;
@@ -97,51 +97,11 @@ void onEvent(){
 			running = false;
 			break;
 		case SDL_KEYDOWN:
-			switch(event.key.keysym.sym){
-				case SDLK_ESCAPE:
-					running = false;
-					break;
-				case SDLK_w:
-					keys[SDLK_w] = true;
-					break;
-				case SDLK_s:
-					keys[SDLK_s] = true;
-					break;
-				case SDLK_a:
-					keys[SDLK_a] = true;
-					break;
-				case SDLK_d:
-					keys[SDLK_d] = true;
-					break;
-				case SDLK_LEFT:
-					keys[SDLK_LEFT] = true;
-					break;
-				case SDLK_RIGHT:
-					keys[SDLK_RIGHT] = true;
-					break;
-			}
+                        keys[event.key.keysym.sym] = true;
 			break;
 		case SDL_KEYUP:
-			switch(event.key.keysym.sym){
-				case SDLK_w:
-					keys[SDLK_w] = false;
-					break;
-				case SDLK_s:
-					keys[SDLK_s] = false;
-					break;
-				case SDLK_a:
-					keys[SDLK_a] = false;
-					break;
-				case SDLK_d:
-					keys[SDLK_d] = false;
-					break;
-				case SDLK_LEFT:
-					keys[SDLK_LEFT] = false;
-					break;
-				case SDLK_RIGHT:
-					keys[SDLK_RIGHT] = false;
-					break;
-			}
+                        keys[event.key.keysym.sym] = false;
+                        break;
 		}
 	}
 }
@@ -176,6 +136,8 @@ void update(){
 	player.velocity.x = 0;
 	player.velocity.y = 0;
 	player.velocity.z = 0;
+
+        running = running && (!keys[SDLK_ESCAPE]);
 }
 
 void render(){
